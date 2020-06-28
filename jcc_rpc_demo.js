@@ -4,13 +4,14 @@ const jtWallet = require("jcc_wallet");
 
 const swtcwallet1 = { address:'jGYPMXBtExPBgFEHKpLbh8vdWUfqW5pFLx', secret: 'ssEEef7JHubPGTCLwTLkuu4oqKtD6' };
 const swtcwallet2 = { address:'jGRevGoFSnKf9tzvGMt8C6BeYYcBURJ8KX', secret: 'ssVvAZrAUj7dxFfLdaVvoVH2VTij2'};
-let swtcHosts = null;
+let rpcHosts = null;
 let explorerHosts = null;
 let exchangeHosts = null;
 let infoHosts = null;
 
 let explorerInst = null;
 let infoInst = null;
+let rpcInst = null;
 
 const hosts = ["jccdex.cn", "weidex.vip"];
 const port = 443;
@@ -26,11 +27,11 @@ const https = true;
 const getConfig = async() => {
     const configInst = ConfigFactory.init(hosts, port, https);
     const configData =  await configInst.getConfig();
-    swtcHosts = configData.jcNodes;
+    rpcHosts = configData.jcNodes;
     explorerHosts = configData.scanHosts;
     exchangeHosts = configData.exHosts;
     infoHosts = configData.infoHosts;
-    console.log(swtcHosts,explorerHosts,exchangeHosts,infoHosts);
+    console.log(rpcHosts,explorerHosts,exchangeHosts,infoHosts);
 };
 
 
@@ -227,8 +228,39 @@ const timeSharingData = async (base, counter, type, time) => {
     }
     const data = res.data;
 
-    console.log('getHistory', data);
+    console.log('timeSharingData', data);
     return data;
+}
+
+/**
+ * 获取分时数据
+ * @param {*} base 交易token名称1
+ * @param {*} counter  交易token名称
+ * * 返回数据结构描述参见: [https://github.com/JCCDex/JingChang-Document/blob/master/zh-CN/Jingchang-RPC-Server.md#35-获取分时数据]
+ */
+const getTickerFromCMC = async (base, counter) => {
+    const res = await infoInst.getTickerFromCMC(base, counter);
+    if (!res.result) {
+        return null;
+    }
+    const data = res.data;
+
+    console.log('getTickerFromCMC', data);
+    return data;
+}
+
+
+/**
+ * 获取sequence
+ * @param {*} base 交易token名称1
+ * @param {*} counter  交易token名称
+ * * 返回数据结构描述参见: [https://github.com/JCCDex/JingChang-Document/blob/master/zh-CN/Jingchang-RPC-Server.md#35-获取分时数据]
+ */
+const getSequence = async (address) => {
+    console.log(rpcInst);
+    const sequence = await rpcInst.getSequence(address);
+    console.log('getSequence', sequence);
+    return sequence;
 }
 
 (async () => {
@@ -241,12 +273,15 @@ const timeSharingData = async (base, counter, type, time) => {
     // await getTokens('9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d');
     // await getTokens('9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d', { currency: 'CNY' });
 
-    infoInst = InfoFactory.init(infoHosts, port, https);
+    //infoInst = InfoFactory.init(infoHosts, port, https);
     // await getTicker('SWT','CNY');
     // await getAllTickers();
     //await getDepth('SWT','CNY', 'normal');
     //await getKline('JUSDT','CNY','4hour');
     //await timeSharingData('SWT','CNY', 'newest', new Date().getTime()/1000);
+    // await getTickerFromCMC('usdt','ether');
+    rpcInst = NodeRpcFactory.init(rpcHosts);
+    await getSequence('jGYPMXBtExPBgFEHKpLbh8vdWUfqW5pFLx');
 
 
 
