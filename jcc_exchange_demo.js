@@ -2,6 +2,8 @@ const { NodeRpcFactory, ConfigFactory, ExchangeFactory, ExplorerFactory, InfoFac
 const BigNumber = require("bignumber.js");
 const jtWallet = require("jcc_wallet").jtWallet;
 const jccExchange = require('jcc_exchange').JCCExchange;
+const { serializePayment } = require("jcc_exchange/lib/tx");
+const {sign} = require('jcc_exchange');
 
 
 const swtcwallet1 = { address:'jGYPMXBtExPBgFEHKpLbh8vdWUfqW5pFLx', secret: 'ssEEef7JHubPGTCLwTLkuu4oqKtD6' };
@@ -11,11 +13,16 @@ let explorerHosts = null;
 let exchangeHosts = null;
 let infoHosts = null;
 
-
+let rpcInst = null;
 const hosts = ["jccdex.cn", "weidex.vip"];
 const port = 443;
 const https = true;
+// 发行方地址
+const issuer = "jGa9J9TkqtBcUoHe2zqhVFFbgUVED6o9or";
 
+const delay = async (timer) => {
+    return await new Promise((resolve) => setTimeout(resolve, timer));
+  };
 
 // const chain_servers = ["https://srje115qd43qw2.swtc.top"];
 // const explorer_server = ["https://swtcscan.jccdex.cn"];
@@ -79,9 +86,64 @@ const transfer = async (secret, amount, memo, to, token)  => {
     console.log('transfer', hash);
 };
 
+/**
+ * 安全转账 防止重复转账
+ * @param {string} secret 转出钱包密钥
+ * @param {*} amount 转账数量
+ * @param {*} memo 转账备注
+ * @param {*} to 转入钱包地址
+ * @param {*} token 转账token(大写)
+ */
+const safe_transfer = async (secret, amount, memo, to, token)  => {
+    token = token.toUpperCase();
+    const address = jtWallet.getAddress(secret);
+    const sequence = await rpcInst.getSequence(address);
+    // jccExchange.init(rpcHosts);
+    // const hash = await jccExchange.transfer(address, secret, amount.toString(), memo, to, token);
+    try {
+        const tx = serializePayment(address, amount, to, token, memo, issuer);
+        // 设置sequence
+        tx.Sequence = sequence;
+        // 签名, 获取blob和交易hash
+        const { blob, hash } = sign(tx, secret, "jingtum", true);
+    
+        let hasSent = false;
+        while (true) {
+          try {
+              if(!hasSent) {
+                await rpcInst.sendRawTransaction(blob);
+                hasSent = true;
+                //console.log('send tranction',new Date().getTime());
+              } else {
+                await delay(15000);
+                const res = await explorerInst.orderDetail(address, hash);
+                //console.log(res)
+                if (res.result && res.data && res.data.succ === "tesSUCCESS") {
+                  // 交易成功
+                  console.log('transfer success hash:', hash);
+                  break;
+                } else {
+                    console.log('transfer failed , will re-try');
+                    hasSent = false;
+                }
+              }
+          } catch (error) {
+              console.log(error);
+              break;
+          }
+        }
+    
+      } catch (error) {
+        console.log(error);
+      }
+};
+
 (async () => {
     await getConfig();
     //await createOrder('ssEEef7JHubPGTCLwTLkuu4oqKtD6', '1', 'SWT', 'CNY', '0.01', 'sell');
     //await cancelOrder('ssEEef7JHubPGTCLwTLkuu4oqKtD6', 7);
-    await transfer('ssEEef7JHubPGTCLwTLkuu4oqKtD6', '1','test', 'jGRevGoFSnKf9tzvGMt8C6BeYYcBURJ8KX','SWT')
+    explorerInst = ExplorerFactory.init(explorerHosts, port, https);
+    rpcInst = NodeRpcFactory.init(rpcHosts);
+    //await transfer('ssEEef7JHubPGTCLwTLkuu4oqKtD6', '1','test', 'jGRevGoFSnKf9tzvGMt8C6BeYYcBURJ8KX','SWT')
+    await safe_transfer('ssEEef7JHubPGTCLwTLkuu4oqKtD6', '1','test', 'jGRevGoFSnKf9tzvGMt8C6BeYYcBURJ8KX','SWT')
 })()
