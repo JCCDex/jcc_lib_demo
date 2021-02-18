@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/xdjiang/jcc_lib_demo#readme",
   "dependencies": {
+    "@swtc/rpc": "^1.0.6",
     "bignumber": "^1.1.0",
     "bignumber.js": "^9.0.0",
     "jcc_exchange": "^3.1.13",
